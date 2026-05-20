@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard KPI Patroli Security</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --pr:#1a56db;--bg:#f1f5f9;--card:#fff;--bd:#e2e8f0;
+  --tx:#0f172a;--mu:#64748b;--hd:#1e3a8a;
+  --green:#059669;--red:#dc2626;--yellow:#d97706;--purple:#7c3aed;--orange:#ea580c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+
+/* ── Header ── */
+header{
+  background:linear-gradient(135deg,#1e3a8a 0%,#1a56db 100%);
+  color:#fff;padding:18px 32px;
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 4px 16px rgba(30,58,138,.3);
+}
+.hdr-left h1{font-size:1.2rem;font-weight:800;letter-spacing:-.01em}
+.hdr-left p{font-size:.78rem;opacity:.75;margin-top:3px}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.hdr-badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
+  border-radius:20px;padding:4px 14px;font-size:.78rem;font-weight:600}
+
+main{padding:24px 32px}
+
+/* ── Upload ── */
+.upload{
+  border:2px dashed #93c5fd;border-radius:14px;background:#eff6ff;
+  padding:36px 24px;text-align:center;cursor:pointer;transition:all .2s;
+  display:block;margin-bottom:24px;
+}
+.upload:hover{background:#dbeafe;border-color:var(--pr)}
+.upload input{display:none}
+.upload .t{color:var(--pr);font-weight:700;margin-top:10px;font-size:1rem}
+.upload .s{font-size:.8rem;color:var(--mu);margin-top:5px}
+
+/* ── Filter bar ── */
+.fbar{
+  background:var(--card);border:1px solid var(--bd);border-radius:12px;
+  padding:16px 20px;margin-bottom:22px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;
+}
+.grp{display:flex;flex-direction:column;gap:4px}
+.grp label{font-size:.68rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em}
+.grp input[type=date],.grp input[type=number],.grp select{
+  border:1px solid var(--bd);border-radius:8px;padding:7px 12px;
+  font-size:.87rem;background:var(--bg);outline:none;min-width:150px;
+}
+.grp input:focus,.grp select:focus{border-color:var(--pr);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:8px;font-weight:700;font-size:.87rem;cursor:pointer;border:none;transition:opacity .15s}
+.btn:hover{opacity:.88}
+.btn-pr{background:var(--pr);color:#fff}
+.btn-g{background:var(--green);color:#fff}
+.btn-o{background:#fff;color:var(--pr);border:1.5px solid var(--pr)}
+
+/* ── KPI Cards ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;border-radius:12px 0 0 12px}
+.kpi.blue::before{background:var(--pr)}
+.kpi.green::before{background:var(--green)}
+.kpi.red::before{background:var(--red)}
+.kpi.purple::before{background:var(--purple)}
+.kpi.orange::before{background:var(--orange)}
+.kpi .val{font-size:1.8rem;font-weight:800;line-height:1;margin-bottom:4px}
+.kpi.blue .val{color:var(--pr)}
+.kpi.green .val{color:var(--green)}
+.kpi.red .val{color:var(--red)}
+.kpi.purple .val{color:var(--purple)}
+.kpi.orange .val{color:var(--orange)}
+.kpi .lbl{font-size:.72rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.kpi .sub{font-size:.7rem;color:var(--mu);margin-top:4px}
+
+/* ── Chart grid ── */
+.chart-grid{display:grid;gap:16px;margin-bottom:22px}
+.chart-grid.two{grid-template-columns:1fr 1fr}
+.chart-grid.three{grid-template-columns:1fr 1fr 1fr}
+.chart-grid.full{grid-template-columns:1fr}
+.ccard{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px 20px}
+.ccard h3{font-size:.82rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.ccard .chart-wrap{position:relative;height:240px}
+.ccard.tall .chart-wrap{height:320px}
+.ccard.xtall .chart-wrap{height:420px}
+
+/* ── Perform summary table ── */
+.ptable{width:100%;border-collapse:collapse;font-size:.8rem}
+.ptable thead tr{background:var(--hd);color:#fff}
+.ptable thead th{padding:9px 12px;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
+.ptable tbody tr:nth-child(even){background:#f8faff}
+.ptable tbody tr:hover{background:#eff6ff}
+.ptable tbody td{padding:8px 12px;border-bottom:1px solid var(--bd)}
+.ptable td.num{text-align:center;font-weight:700}
+.bp{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:700}
+.bp.p{background:#d1fae5;color:#065f46}
+.bp.t{background:#fee2e2;color:#991b1b}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:0;margin-bottom:18px;border:1px solid var(--bd);border-radius:10px;overflow:hidden;width:fit-content}
+.tabs button{padding:9px 22px;border:none;background:var(--card);font-size:.87rem;font-weight:600;color:var(--mu);cursor:pointer}
+.tabs button.active{background:var(--hd);color:#fff}
+
+.es{text-align:center;padding:60px;color:var(--mu)}
+.es .i{font-size:3rem}.es p{margin-top:10px;font-size:.95rem}
+
+@media(max-width:900px){
+  .chart-grid.two,.chart-grid.three{grid-template-columns:1fr}
+  main{padding:16px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr-left">
+    <h1>🛡️ Dashboard KPI Patroli Security</h1>
+    <p>Analisis performa patroli per area, titik, dan rentang waktu</p>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-badge" id="hdrRange">Belum ada data</div>
+  </div>
+</header>
+
+<main>
+  <!-- Upload -->
+  <label class="upload" id="uz">
+    <input type="file" id="fi" accept=".csv">
+    <div style="font-size:2.5rem">📂</div>
+    <div class="t" id="ut">Klik atau drag &amp; drop file CSV Patroli Security</div>
+    <div class="s" id="us">Format: PATROLI_SECURITY CSV</div>
+  </label>
+
+  <!-- Filter -->
+  <div class="fbar" id="fbar" style="display:none">
+    <div class="grp"><label>Dari Tanggal</label><input type="date" id="dFrom"></div>
+    <div class="grp"><label>Sampai Tanggal</label><input type="date" id="dTo"></div>
+    <div class="grp"><label>Batas Perform (≥)</label><input type="number" id="threshold" value="80" min="1" style="min-width:100px"></div>
+    <div class="grp"><label>&nbsp;</label><button class="btn btn-pr" onclick="applyFilter()">🔍 Terapkan</button></div>
+    <div class="grp"><label>&nbsp;</label><button class="btn btn-o" onclick="rst()">↺ Reset</button></div>
+    <div class="grp" style="margin-left:auto"><label>&nbsp;</label><button class="btn btn-g" onclick="doExport()">⬇ Export Excel</button></div>
+  </div>
+
+  <div id="dashContent">
+    <div class="es"><div class="i">📊</div><p>Upload file CSV untuk melihat dashboard</p></div>
+  </div>
+</main>
+
+<script>
+const BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const BLN_SHORT=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+const AREA_DEF=[
+  {col:'TITIK CEKLIST PATROLI BALARAJA',label:'Balaraja',color:'#7c3aed',
+   titik:['GEDUNG A','GEDUNG B','GEDUNG C','GEDUNG D','GEDUNG STORE','GERBANG MESS 1','GERBANG MESS 2','LGTC A','LGTC B','MESS 1 BLOK A6','MESS 1 BLOK J1','MESS 1 BLOK O','MESS 2 BLOK R11','MESS 2 BLOK R6','MESS 2 BLOK T3','MESS 2 BLOK V10','MESS 3 BLOK J7-J8','MESS 3 BLOK J8-J9','MESS 3 BLOK K10-K11','MESS 3 BLOK K11-K12','MESS 3 BLOK K9-K10','MESS 3 BLOK M1-M2','MESS 3 BLOK M7-M8','MESS 3 PERSIMPANGAN BLOK J-K','MESS LAUNDRY','PARKIRAN MOTOR']},
+  {col:'TITIK CEKLIST PATROLI LOC',label:'LOC',color:'#0369a1',
+   titik:['PARKIR SELATAN','GEDUNG MERAH','GEDUNG BIRU','PARKIR UTARA']},
+  {col:'TITIK CEKLIST PATROLI BANDARA MAS',label:'Bandara MAS',color:'#b45309',
+   titik:['SIMULATOR A','SIMULATOR C','GEDUNG STORE H','ME/GA','GEDUNG SLOW MOVING']},
+  {col:'TITIK CEKLIST PATROLI LAT',label:'LAT',color:'#065f46',
+   titik:['Titik Stage Wedding','Titik Balroom 11','Titik Tunggu 10','Titik Tengah Lantai 9','Titik Meeting 8','Titik Meeting 7','Titik Selasar 6','Titik Aula 5','Ruang Tunggu 3','Titik Slot 2','Customer Care 1','customer care 1','Titik Valet','Titik Motor 2','Titik Motor 1']},
+  {col:'TITIK CEKLIST PATROLI HLP',label:'HLP',color:'#9f1239',
+   titik:['AREA OUTGOING','AREA DATA ENTRY','EX PRAMUGARI','PARKIRAN MOBIL','PARKIRAN MOTOR','AREA GUDANG','AREA INCOMING']}
+];
+AREA_DEF.forEach(a=>{ a.set=new Set(a.titik.map(t=>t.toUpperCase())); });
+
+let allC=[],raw=[],charts={};
+
+// ── Upload ──────────────────────────────────────────────────────────────────
+const uz=document.getElementById('uz');
+document.getElementById('fi').addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0])});
+uz.addEventListener('dragover',e=>{e.preventDefault();uz.style.background='#dbeafe'});
+uz.addEventListener('dragleave',()=>uz.style.background='');
+uz.addEventListener('drop',e=>{e.preventDefault();uz.style.background='';if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
+
+function loadFile(file){
+  document.getElementById('ut').textContent='⏳ Memproses '+file.name+'...';
+  Papa.parse(file,{header:true,skipEmptyLines:true,complete(r){
+    allC=r.meta.fields||[];raw=r.data;
+    parseRaw();
+    setDefaultDates();
+    applyFilter();
+    document.getElementById('ut').textContent='✅ '+file.name;
+    document.getElementById('us').textContent=raw.length.toLocaleString()+' baris dimuat';
+    document.getElementById('fbar').style.display='flex';
+  },error(e){alert('Gagal: '+e.message)}});
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function parseTgl(s){
+  if(!s)return null;
+  const str=String(s).trim().split(' ')[0];
+  const p=str.split('/');
+  if(p.length!==3)return null;
+  const dd=parseInt(p[0],10),mm=parseInt(p[1],10),yy=parseInt(p[2],10);
+  if(!dd||!mm||!yy||yy<2000)return null;
+  return new Date(yy,mm-1,dd);
+}
+function fmtTgl(d){return d?d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear():'-'}
+function dateKey(d){if(!d)return null;return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function findCol(name){const key=name.toUpperCase();return allC.find(c=>c.replace(/^\uFEFF/,'').trim().toUpperCase()===key)||null;}
+function dateFromInput(id){const v=document.getElementById(id).value;if(!v)return null;const p=v.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+function parseRaw(){
+  const TC=findCol('TIMESTAMP')||findCol('TimeStamp')||allC[0];
+  raw.forEach(row=>{
+    row._ts=parseTgl(TC?row[TC]:null);
+    row._key=dateKey(row._ts);
+    row._areaIdx=-1;row._titikVal='';
+    for(let i=0;i<AREA_DEF.length;i++){
+      const v=row[AREA_DEF[i].col];
+      if(v&&String(v).trim()!==''){
+        const vUp=String(v).trim().toUpperCase();
+        if(AREA_DEF[i].set.has(vUp)){row._areaIdx=i;row._titikVal=String(v).trim();break;}
+      }
+    }
+  });
+}
+
+function setDefaultDates(){
+  const dates=raw.map(r=>r._key).filter(Boolean).sort();
+  if(dates.length){
+    document.getElementById('dFrom').value=dates[0];
+    document.getElementById('dTo').value=dates[dates.length-1];
+  }
+}
+
+function rst(){
+  setDefaultDates();
+  document.getElementById('threshold').value='80';
+  applyFilter();
+}
+
+// ── Apply Filter & Build Dashboard ──────────────────────────────────────────
+function applyFilter(){
+  const from=dateFromInput('dFrom');
+  const to  =dateFromInput('dTo');
+  const thr =parseInt(document.getElementById('threshold').value)||80;
+  const toEnd=to?new Date(to.getFullYear(),to.getMonth(),to.getDate(),23,59,59):null;
+
+  const fil=raw.filter(r=>{
+    if(!r._ts)return false;
+    if(from&&r._ts<from)return false;
+    if(toEnd&&r._ts>toEnd)return false;
+    return true;
+  });
+
+  // Header badge
+  document.getElementById('hdrRange').textContent=
+    (from?fmtTgl(from):'Awal')+' → '+(to?fmtTgl(to):'Akhir')+' | Threshold: '+thr;
+
+  buildDashboard(fil,thr,from,to);
+}
+
+// ── Build Dashboard ──────────────────────────────────────────────────────────
+function buildDashboard(fil,thr,from,to){
+  // 1. Hitung jumlah per titik per area
+  const countMap={};
+  AREA_DEF.forEach((a,ai)=>{countMap[ai]={};a.titik.forEach(t=>{countMap[ai][t]=0;});});
+  fil.forEach(r=>{
+    const ai=r._areaIdx; if(ai<0)return;
+    if(countMap[ai]&&countMap[ai].hasOwnProperty(r._titikVal)) countMap[ai][r._titikVal]++;
+  });
+
+  // 2. titikRows
+  const titikRows=[];
+  AREA_DEF.forEach((a,ai)=>{
+    a.titik.forEach(t=>{
+      const n=countMap[ai][t]||0;
+      titikRows.push({area:a.label,color:a.color,titik:t,jumlah:n,status:n>=thr?'Perform':'Tidak Perform'});
+    });
+  });
+
+  // 3. Hitung per hari per area
+  const dailyMap={};
+  fil.forEach(r=>{
+    if(!r._key)return;
+    if(!dailyMap[r._key])dailyMap[r._key]={total:0,byArea:[0,0,0,0,0]};
+    dailyMap[r._key].total++;
+    if(r._areaIdx>=0)dailyMap[r._key].byArea[r._areaIdx]++;
+  });
+  const dailyDates=Object.keys(dailyMap).sort();
+
+  // 4. KPIs
+  const totalBaris=fil.length;
+  const totalHari=new Set(fil.map(r=>r._key).filter(Boolean)).size;
+  const prf=titikRows.filter(r=>r.status==='Perform').length;
+  const tdk=titikRows.filter(r=>r.status==='Tidak Perform').length;
+  const totalTitik=titikRows.reduce((s,r)=>s+r.jumlah,0);
+
+  // Build HTML
+  const dc=document.getElementById('dashContent');
+  dc.innerHTML=`
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi blue"><div class="val">${totalBaris.toLocaleString()}</div><div class="lbl">Total Data</div><div class="sub">dalam rentang</div></div>
+      <div class="kpi purple"><div class="val">${totalHari}</div><div class="lbl">Jumlah Hari</div><div class="sub">aktif patroli</div></div>
+      <div class="kpi orange"><div class="val">${totalTitik.toLocaleString()}</div><div class="lbl">Total Titik</div><div class="sub">semua area</div></div>
+      <div class="kpi green"><div class="val">${prf}</div><div class="lbl">Titik Perform</div><div class="sub">≥ ${thr} patroli</div></div>
+      <div class="kpi red"><div class="val">${tdk}</div><div class="lbl">Titik Tidak Perform</div><div class="sub">< ${thr} patroli</div></div>
+    </div>
+
+    <!-- Row 1: Donut Perform + Bar per Area -->
+    <div class="chart-grid two">
+      <div class="ccard">
+        <h3>🎯 Perform vs Tidak Perform</h3>
+        <div class="chart-wrap"><canvas id="cDonut"></canvas></div>
+      </div>
+      <div class="ccard">
+        <h3>📊 Total Patroli per Area</h3>
+        <div class="chart-wrap"><canvas id="cArea"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Row 2: Trend harian -->
+    <div class="chart-grid full">
+      <div class="ccard tall">
+        <h3>📈 Trend Patroli Harian per Area</h3>
+        <div class="chart-wrap" style="height:300px"><canvas id="cTrend"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Row 3: Bar per titik per area -->
+    <div class="chart-grid two">
+      <div class="ccard tall">
+        <h3 style="color:#7c3aed">🏠 Jumlah per Titik – Balaraja</h3>
+        <div class="chart-wrap"><canvas id="cBal"></canvas></div>
+      </div>
+      <div class="ccard tall">
+        <h3 style="color:#0369a1">🏢 Jumlah per Titik – LOC</h3>
+        <div class="chart-wrap"><canvas id="cLoc"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-grid three">
+      <div class="ccard tall">
+        <h3 style="color:#b45309">✈️ Jumlah per Titik – Bandara MAS</h3>
+        <div class="chart-wrap"><canvas id="cBan"></canvas></div>
+      </div>
+      <div class="ccard tall">
+        <h3 style="color:#065f46">🏨 Jumlah per Titik – LAT</h3>
+        <div class="chart-wrap"><canvas id="cLat"></canvas></div>
+      </div>
+      <div class="ccard tall">
+        <h3 style="color:#9f1239">📦 Jumlah per Titik – HLP</h3>
+        <div class="chart-wrap"><canvas id="cHlp"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Table ringkasan per titik -->
+    <div class="ccard" style="margin-bottom:0">
+      <h3>📋 Ringkasan Semua Titik</h3>
+      ${buildSummaryTable(titikRows,thr)}
+    </div>
+  `;
+
+  // Render charts
+  renderDonut(prf,tdk);
+  renderAreaBar(countMap,thr);
+  renderTrend(dailyDates,dailyMap);
+  AREA_DEF.forEach((a,ai)=>{
+    const ids=['cBal','cLoc','cBan','cLat','cHlp'];
+    renderTitikBar(ids[ai], a, countMap[ai], thr);
+  });
+}
+
+// ── Chart renderers ──────────────────────────────────────────────────────────
+function renderDonut(prf,tdk){
+  destroyChart('cDonut');
+  charts['cDonut']=new Chart(document.getElementById('cDonut'),{
+    type:'doughnut',
+    data:{
+      labels:['Perform','Tidak Perform'],
+      datasets:[{data:[prf,tdk],backgroundColor:['#059669','#dc2626'],borderWidth:0,hoverOffset:8}]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'bottom',labels:{font:{size:12},padding:16}},
+        tooltip:{callbacks:{label:ctx=>{
+          const total=ctx.dataset.data.reduce((a,b)=>a+b,0);
+          const pct=total>0?Math.round(ctx.raw/total*100):0;
+          return ` ${ctx.label}: ${ctx.raw} titik (${pct}%)`;
+        }}}
+      },
+      cutout:'65%'
+    }
+  });
+}
+
+function renderAreaBar(countMap,thr){
+  destroyChart('cArea');
+  const labels=AREA_DEF.map(a=>a.label);
+  const totals=AREA_DEF.map((a,ai)=>Object.values(countMap[ai]||{}).reduce((s,n)=>s+n,0));
+  const prfCounts=AREA_DEF.map((a,ai)=>a.titik.filter(t=>(countMap[ai][t]||0)>=thr).length);
+  const tdkCounts=AREA_DEF.map((a,ai)=>a.titik.filter(t=>(countMap[ai][t]||0)<thr).length);
+  charts['cArea']=new Chart(document.getElementById('cArea'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Total Patroli',data:totals,backgroundColor:AREA_DEF.map(a=>a.color+'cc'),borderRadius:6,yAxisID:'y'},
+        {label:'Titik Perform',data:prfCounts,backgroundColor:'#059669',borderRadius:6,yAxisID:'y1',type:'bar'},
+        {label:'Titik Tidak Perform',data:tdkCounts,backgroundColor:'#dc2626',borderRadius:6,yAxisID:'y1',type:'bar'},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}},
+      scales:{
+        y:{position:'left',title:{display:true,text:'Total Patroli',font:{size:11}},beginAtZero:true},
+        y1:{position:'right',title:{display:true,text:'Jumlah Titik',font:{size:11}},beginAtZero:true,grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+}
+
+function renderTrend(dates,dailyMap){
+  destroyChart('cTrend');
+  // Ambil maks 60 hari terakhir untuk keterbacaan
+  const sliced=dates.slice(-60);
+  const labels=sliced.map(dk=>{const d=new Date(dk);return d.getDate()+'/'+BLN_SHORT[d.getMonth()];});
+  const datasets=AREA_DEF.map((a,ai)=>({
+    label:a.label,
+    data:sliced.map(dk=>(dailyMap[dk]?.byArea[ai])||0),
+    borderColor:a.color,backgroundColor:a.color+'22',
+    tension:.3,fill:false,pointRadius:2,pointHoverRadius:5,borderWidth:2
+  }));
+  charts['cTrend']=new Chart(document.getElementById('cTrend'),{
+    type:'line',data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}},
+      scales:{
+        x:{ticks:{maxTicksLimit:20,font:{size:10}},grid:{display:false}},
+        y:{beginAtZero:true,title:{display:true,text:'Jumlah Patroli',font:{size:11}}}
+      },
+      interaction:{mode:'index',intersect:false}
+    }
+  });
+}
+
+function renderTitikBar(canvasId,areaDef,counts,thr){
+  destroyChart(canvasId);
+  const labels=areaDef.titik.map(t=>t.length>20?t.slice(0,20)+'…':t);
+  const data=areaDef.titik.map(t=>counts[t]||0);
+  const colors=data.map(n=>n>=thr?'#059669':'#dc2626');
+  charts[canvasId]=new Chart(document.getElementById(canvasId),{
+    type:'bar',
+    data:{labels,datasets:[{
+      label:'Jumlah Patroli',data,
+      backgroundColor:colors,borderRadius:5,
+    }]},
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>{
+          const n=ctx.raw;
+          return ` ${n} patroli — ${n>=thr?'✓ Perform':'✗ Tidak Perform'}`;
+        }}}
+      },
+      scales:{
+        x:{beginAtZero:true,
+          plugins:{annotation:{annotations:{line1:{type:'line',xMin:thr,xMax:thr,borderColor:'#f59e0b',borderWidth:2,borderDash:[4,4]}}}}}
+      }
+    }
+  });
+}
+
+function buildSummaryTable(rows,thr){
+  let h=`<div style="overflow-x:auto"><table class="ptable"><thead><tr>
+    <th>Area</th><th>Nama Titik</th><th style="text-align:center">Jumlah</th>
+    <th style="text-align:center">Threshold</th><th>Status</th>
+  </tr></thead><tbody>`;
+  rows.forEach(r=>{
+    h+=`<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};margin-right:6px"></span>${esc(r.area)}</td>
+      <td>${esc(r.titik)}</td>
+      <td class="num" style="color:${r.status==='Perform'?'#059669':'#dc2626'}">${r.jumlah}</td>
+      <td class="num" style="color:var(--mu)">${thr}</td>
+      <td><span class="bp ${r.status==='Perform'?'p':'t'}">${r.status}</span></td>
+    </tr>`;
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────
+function doExport(){
+  const from=dateFromInput('dFrom');
+  const to=dateFromInput('dTo');
+  const thr=parseInt(document.getElementById('threshold').value)||80;
+  const toEnd=to?new Date(to.getFullYear(),to.getMonth(),to.getDate(),23,59,59):null;
+  const fil=raw.filter(r=>{
+    if(!r._ts)return false;
+    if(from&&r._ts<from)return false;
+    if(toEnd&&r._ts>toEnd)return false;
+    return true;
+  });
+  const countMap={};
+  AREA_DEF.forEach((a,ai)=>{countMap[ai]={};a.titik.forEach(t=>{countMap[ai][t]=0;});});
+  fil.forEach(r=>{const ai=r._areaIdx;if(ai<0)return;if(countMap[ai]&&countMap[ai].hasOwnProperty(r._titikVal))countMap[ai][r._titikVal]++;});
+  const hdr=['Area','Nama Titik','Jumlah Patroli',`Threshold (${thr})`,'Status'];
+  const data=[hdr];
+  AREA_DEF.forEach((a,ai)=>{
+    a.titik.forEach(t=>{
+      const n=countMap[ai][t]||0;
+      data.push([a.label,t,n,thr,n>=thr?'Perform':'Tidak Perform']);
+    });
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:14},{wch:36},{wch:16},{wch:14},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws,'Dashboard');
+  const f=from?fmtTgl(from).replace(/ /g,'-'):'';
+  const t2=to?fmtTgl(to).replace(/ /g,'-'):'';
+  XLSX.writeFile(wb,`Dashboard_Patroli${f?'_'+f:''}${t2?'_sd_'+t2:''}.xlsx`);
+}
+</script>
+</body>
+</html>
